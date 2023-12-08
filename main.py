@@ -173,7 +173,7 @@ def main(x, y):
                                                     lr=lr, loss=loss, device=device, test_model=test_model,
                                                     save_path=save_path, continue_train=continue_train)
 
-def ksvd_n_g_p(dataset, k):
+def truncatedSVD(dataset, k):
     U, S, Vt = np.linalg.svd(dataset)
     s = S[:k]
     new_S = np.diag(s)
@@ -182,53 +182,100 @@ def ksvd_n_g_p(dataset, k):
     new_U = U[:,:k]
     new_Vt = Vt[:k,:]
 
-    print(new_U.shape, new_S.shape, new_Vt.shape)
-    reconst_matrix = new_U @ new_S @ new_Vt
+    truncated_dataset = new_U @ new_S
+    reconstructed_dataset = truncated_dataset @ new_Vt
 
-    return reconst_matrix, new_S
+    return truncated_dataset, reconstructed_dataset
 
 if __name__ == "__main__":
     dataset = np.loadtxt("final_data.csv", delimiter=",", dtype=str)[1:]
     _, dataset = np.split(dataset, [3], axis=1)
     labels, features = np.split(dataset.astype("float32"), [1], axis=1)
     total_num_of_features = features.shape[1]
+    y = torch.from_numpy(labels)
 
     # ksvd
     result = [0] * (total_num_of_features+1)
     for k in range(1, total_num_of_features+1):
-        reduced_features, _ = ksvd_n_g_p(features, k)
+        reduced_features, _ = truncatedSVD(features, k)
         x = torch.from_numpy(reduced_features)
-        y = torch.from_numpy(labels)
         mlp, train_history, val_history, test_loss = main(x, y)
         result[k] = test_loss
 
+    print(f" ========= K-SVD Reduction training ========= ")
+    best_k = np.argmin(result)
+    lowest_loss = result[best_k]
     for k in range(len(result)):
         print(k, result[k])
+    print(f"Best k: {best_k}, Lowest loss: {lowest_loss}")
 
-    # Lasso
-    mask = [True] * total_num_of_features
-    result = {}
-    while sum(mask) > 0:
-        local_best_new_mask = mask.copy
-        local_best_loss = None
+    from sklearn.linear_model import Lasso
+    # Lasso: fits linear model with L1 weight regularization
+    # Normalize features so that they are on the same scale
+    lasso_features = (features - features.mean(axis=0)) / features.std(axis=0)
+    lasso_model = Lasso(random_state = 1)
+    lasso_model.fit(lasso_features, labels)
 
-        for i in range(len(mask)):
-            if not mask[i]: continue
-            new_mask = mask.copy()
-            new_mask[i] = False
-            reduced_features = features[:,new_mask]
-            
-            x = torch.from_numpy(reduced_features)
-            y = torch.from_numpy(labels)
-            mlp, train_history, val_history, test_loss = main(x, y)
+    # Get the weights of the model and choose features based on some threshold on the weights
+    weights = lasso_model.coef_
+    threshold = 0.1
+    mask = np.abs(weights) > threshold
+    reduced_features = features[:, mask]
+    x = torch.from_numpy(reduced_features)
+    mlp, train_history, val_history, test_loss = main(x, y)
 
-            if local_best_loss is None or test_loss < local_best_loss:
-                local_best_loss = test_loss
-                local_best_new_mask = new_mask
-        
-        result[tuple(local_best_new_mask)] = local_best_loss
-        print(local_best_new_mask, local_best_loss)
-        mask = local_best_new_mask
+    print(f" ========= Lasso Reduction training ========= ")
+    print(f"Threshold: {threshold}")
+    print(f"Number of features: {sum(mask)} out of {total_num_of_features}")
+    print(f"Chosen feature idxs: {np.where(mask)}")
+    print(f"Test loss: {test_loss}")
 
-    for mask in result:
-        print(mask, result[mask])
+    # mask = [True] * total_num_of_features
+    # result = {}
+    # while sum(mask) > 0:
+    #     local_best_new_mask = mask.copy
+    #     local_best_loss = None
+
+    #     for i in range(len(mask)):
+    #         if not mask[i]: continue
+    #         new_mask = mask.copy()
+    #         new_mask[i] = False
+    #         reduced_features = features[:,new_mask]
+
+    #         x = torch.from_numpy(reduced_features)
+    #         y = torch.from_numpy(labels)
+    #         mlp, train_history, val_history, test_loss = main(x, y)
+
+    #         if local_best_loss is None or test_loss < local_best_loss:
+    #             local_best_loss = test_loss
+    #             local_best_new_mask = new_mask
+
+    #     result[tuple(local_best_new_mask)] = local_best_loss
+    #     print(local_best_new_mask, local_best_loss)
+    #     mask = local_best_new_mask
+
+    # for mask in result:
+    #     print(mask, result[mask])
+
+    from sklearn.decomposition import PCA
+
+    pca_result = [0] * (total_num_of_features+1)
+    y = torch.from_numpy(labels)
+    for k in tqdm(range(1, total_num_of_features+1)):
+        pca = PCA(n_components=k)
+        pca.fit(features)
+
+        # Reconstruct the data using the principal vector then train the MLP while recording the loss
+        principal_components = pca.components_
+        reduced_features = features @ principal_components.T
+        x = torch.from_numpy(reduced_features)
+
+        mlp, train_history, val_history, test_loss = main(x, y)
+        pca_result[k] = test_loss
+
+    best_k = np.argmin(pca_result)
+    lowest_loss = pca_result[best_k]
+    print(f" ========= PCA Reduction training ========= ")
+    print(pca_result)
+    print(f"Best k: {best_k}, Lowest loss: {lowest_loss}")
+
