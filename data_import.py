@@ -4,8 +4,10 @@ import us
 import os
 import gc
 import re
+
+path = os.getcwd()
 def irrigation_intake():
-    data = pd.read_csv('irrigation.csv')
+    data = pd.read_csv( path + '/' + 'irrigation.csv')
     data.drop(columns='Name', inplace=True)
     # print(data.columns)
     data = data.groupby(by='stfips', ).mean()
@@ -29,11 +31,6 @@ def irrigation_intake():
     for i in data['year']:
         print(type(i))
     data.columns = ['NAME', 'DATE', 'IRRIGATION']
-    # data['NAME'] = data['stfips'].apply(state_to_fips)
-    # fips_to_state = {str_key : fips_to_state.values}
-    # fips_to_state.keys = int(fips_to_state.keys)
-
-    # print(data.head)
     data.to_csv('out.csv')
 
 
@@ -88,7 +85,6 @@ def intake(folder):
 
 # intake(folder)
 def merge(folder, code):
-    # print(os.listdir(folder))
     files = os.walk(folder)
     master_df_list = []
     data = []
@@ -97,7 +93,6 @@ def merge(folder, code):
     root = data[0]
     data = data[2]
     data = sorted(data)
-    # print(data)
     prev_state = 'AL'
     state_df = pd.DataFrame()
     df_list = []
@@ -113,31 +108,20 @@ def merge(folder, code):
             state_df = date
             first = False
             continue
-        # print(date.shape)
         date = date.loc[(date['DATE'] >= 1965) & (date['DATE'] < 2009)]
         date = date[date[code].notna()]
-        # print(date['FZF0'].isna().sum())
         date.reset_index(inplace=True)
         if date.empty:
             continue
-        # print(date['NAME'])
-        # date = date[data['DATE'] < 2009]
         state = re.search(' [A-Z][A-Z] US', date['NAME'][0])[0][1:3]
         if state == 'AH':
             print(date['NAME'][0])
-        # print(date['NAME'][0])
-        # print(state)
         if state == prev_state:
             df_list.append(date[['NAME', 'DATE', code]])
-            # print(pd.concat([state_df, date], keys=['NAME'], axis=0))
-            # print(date.columns)
-            # state_df = state_df.merge(date[['NAME', 'DATE', 'FZF0']], on='DATE')  # , 'FZF5'
             prev_state = state
         else:
             for j in df_list:
-                # print(state_df.shape)
                 state_df = pd.concat([state_df, j])
-                # print(state_df.shape)
             state_df = state_df[['DATE', code]].groupby(by='DATE').mean()
             print('- - - --')
             state_df['NAME'] = prev_state
@@ -219,7 +203,8 @@ def stitcher():
     final_data = pd.merge(left=final_data, right=temp_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
     final_data.sort_values(['NAME', 'DATE'])
     final_data = final_data[(final_data['DATE'] > 1964)]
-    final_data.to_csv('/Users/chrisdoyle/Desktop/final_data.csv')
+    final_data = pd.concat([final_data, pd.get_dummies(final_data['NAME'])], axis=1)
+    final_data.to_csv(path + '/' + 'final_data.csv')
 
 
 
