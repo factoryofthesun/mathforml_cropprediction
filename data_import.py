@@ -4,7 +4,7 @@ import us
 import os
 import gc
 import re
-
+ffill = False
 path = os.getcwd()
 def irrigation_intake():
     data = pd.read_csv( path + '/' + 'irrigation.csv')
@@ -202,24 +202,25 @@ def stitcher():
     final_data = pd.merge(left=final_data, right=drought_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
     final_data = pd.merge(left=final_data, right=temp_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
     final_data.sort_values(['NAME', 'DATE'], inplace=True)
-    states = list(set(list(final_data['NAME'])))
-    grouped_pre_sep = final_data.groupby('NAME')
-    post_sep = []
-    for i in states:
-        post_sep.append(grouped_pre_sep.get_group(i))
-    reconstructed = post_sep[0]
-    for j in ['PHOS', 'POT', 'IRRIGATION', 'NITRO']:
-        reconstructed.loc[:, j].replace(0, np.nan, inplace=True)
-        reconstructed.loc[:, j].ffill(inplace=True, axis=0)
-        reconstructed.loc[:, j].fillna(0, inplace=True)
-    reconstructed.to_csv('first.csv')
-    for i in post_sep[1:]:
+    if ffill:
+        states = list(set(list(final_data['NAME'])))
+        grouped_pre_sep = final_data.groupby('NAME')
+        post_sep = []
+        for i in states:
+            post_sep.append(grouped_pre_sep.get_group(i))
+        reconstructed = post_sep[0]
         for j in ['PHOS', 'POT', 'IRRIGATION', 'NITRO']:
-            i[j] = i.loc[:, j].replace(0, np.nan)
-            i.loc[:, j].ffill(inplace=True, axis=0)
-            i.loc[:, j].fillna(0, inplace=True)
-        reconstructed = pd.concat([reconstructed, i])
-    final_data = reconstructed
+            reconstructed.loc[:, j].replace(0, np.nan, inplace=True)
+            reconstructed.loc[:, j].ffill(inplace=True, axis=0)
+            reconstructed.loc[:, j].fillna(0, inplace=True)
+        reconstructed.to_csv('first.csv')
+        for i in post_sep[1:]:
+            for j in ['PHOS', 'POT', 'IRRIGATION', 'NITRO']:
+                i[j] = i.loc[:, j].replace(0, np.nan)
+                i.loc[:, j].ffill(inplace=True, axis=0)
+                i.loc[:, j].fillna(0, inplace=True)
+            reconstructed = pd.concat([reconstructed, i])
+        final_data = reconstructed
     final_data = final_data[(final_data['DATE'] > 1964)]
     final_data = pd.concat([final_data, pd.get_dummies(final_data['NAME'])], axis=1)
     final_data.to_csv(path + '/' + 'final_data.csv')
