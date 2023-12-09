@@ -207,13 +207,17 @@ def stitcher():
     post_sep = []
     for i in states:
         post_sep.append(grouped_pre_sep.get_group(i))
-    post_sep[0].loc[:, ['PHOS', 'POT', 'NITRO']].replace(0, np.nan, inplace=True)
     reconstructed = post_sep[0]
-    reconstructed.loc[:, ['PHOS', 'POT', 'NITRO']].ffill(inplace=True, axis=0)
-
+    for j in ['PHOS', 'POT', 'IRRIGATION', 'NITRO']:
+        reconstructed.loc[:, j].replace(0, np.nan, inplace=True)
+        reconstructed.loc[:, j].ffill(inplace=True, axis=0)
+        reconstructed.loc[:, j].fillna(0, inplace=True)
+    reconstructed.to_csv('first.csv')
     for i in post_sep[1:]:
-        i.loc[:, ['PHOS', 'POT', 'NITRO']].replace(0, np.nan, inplace=True)
-        i.loc[:, ['PHOS', 'POT', 'NITRO']].ffill(inplace=True, axis=0)
+        for j in ['PHOS', 'POT', 'IRRIGATION', 'NITRO']:
+            i[j] = i.loc[:, j].replace(0, np.nan)
+            i.loc[:, j].ffill(inplace=True, axis=0)
+            i.loc[:, j].fillna(0, inplace=True)
         reconstructed = pd.concat([reconstructed, i])
     final_data = reconstructed
     final_data = final_data[(final_data['DATE'] > 1964)]
