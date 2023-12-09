@@ -4,7 +4,7 @@ import us
 import os
 import gc
 import re
-ffill = True
+ffill = False
 path = os.getcwd()
 def irrigation_intake():
     data = pd.read_csv( path + '/' + 'irrigation.csv')
