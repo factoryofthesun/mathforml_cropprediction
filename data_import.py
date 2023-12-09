@@ -4,7 +4,7 @@ import us
 import os
 import gc
 import re
-ffill = False
+ffill = True
 path = os.getcwd()
 def irrigation_intake():
     data = pd.read_csv( path + '/' + 'irrigation.csv')
@@ -222,7 +222,7 @@ def stitcher():
             reconstructed = pd.concat([reconstructed, i])
         final_data = reconstructed
     final_data = final_data[(final_data['DATE'] > 1964)]
-    final_data = pd.concat([final_data, pd.get_dummies(final_data['NAME'])], axis=1)
+    # final_data = pd.concat([final_data, pd.get_dummies(final_data['NAME'])], axis=1)
     final_data.to_csv(path + '/' + 'final_data.csv')
 
 
