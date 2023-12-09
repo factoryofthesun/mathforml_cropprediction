@@ -201,7 +201,21 @@ def stitcher():
     final_data = pd.merge(left=final_data, right=fert_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
     final_data = pd.merge(left=final_data, right=drought_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
     final_data = pd.merge(left=final_data, right=temp_data, on=['DATE', 'NAME'], how='left').drop(columns='Unnamed: 0').fillna(0)
-    final_data.sort_values(['NAME', 'DATE'])
+    final_data.sort_values(['NAME', 'DATE'], inplace=True)
+    states = list(set(list(final_data['NAME'])))
+    grouped_pre_sep = final_data.groupby('NAME')
+    post_sep = []
+    for i in states:
+        post_sep.append(grouped_pre_sep.get_group(i))
+    post_sep[0].loc[:, ['PHOS', 'POT', 'NITRO']].replace(0, np.nan, inplace=True)
+    reconstructed = post_sep[0]
+    reconstructed.loc[:, ['PHOS', 'POT', 'NITRO']].ffill(inplace=True, axis=0)
+
+    for i in post_sep[1:]:
+        i.loc[:, ['PHOS', 'POT', 'NITRO']].replace(0, np.nan, inplace=True)
+        i.loc[:, ['PHOS', 'POT', 'NITRO']].ffill(inplace=True, axis=0)
+        reconstructed = pd.concat([reconstructed, i])
+    final_data = reconstructed
     final_data = final_data[(final_data['DATE'] > 1964)]
     final_data = pd.concat([final_data, pd.get_dummies(final_data['NAME'])], axis=1)
     final_data.to_csv(path + '/' + 'final_data.csv')
